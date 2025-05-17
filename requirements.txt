@@ -1,0 +1,20 @@
+python-dotenv
+# sys
+# os
+sqlalchemy
+pandas
+matplotlib
+seaborn
+numpy
+#textwarap # este no se instalo
+overpy
+tqdm
+#glob # este no se instalo
+#ast # este no se instalo
+kafka-python 
+requests
+overpy
+great_expectations==0.18.21  
+pendulum
+pytest 
+pytest-mock
