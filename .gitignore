@@ -3,4 +3,4 @@ venv/
 logs/
 __pycache__/
 data/*.csv
-data/
+data/raw/*.csv

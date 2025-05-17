@@ -17,7 +17,7 @@ x-airflow-common:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
     - ./great_expectations:/opt/airflow/great_expectations
-    - ./data:/data
+    - ./data:/opt/airflow/data 
     - ./requirements.txt:/requirements.txt  
     - ./.env:/opt/airflow/.env
   user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-50000}"
