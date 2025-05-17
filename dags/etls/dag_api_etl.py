@@ -45,11 +45,15 @@ CITIES_BOUNDING_BOXES = {
     "Charlotte": (35.0000, -81.2000, 35.5000, -80.5000)
 }
 
-def _fetch_and_parse_osm_data(api_instance, city_name, bbox, _):
-    """Obtiene y parsea datos OSM para una ciudad."""
+def _fetch_and_parse_osm_data(api_instance, city_name, bbox, max_retries=3, delay_seconds=30):
+    """Obtiene y parsea datos OSM para una ciudad con reintentos y manejo de errores de red."""
+    import time
+    from http.client import IncompleteRead
+    import overpy
+
     bbox_str = f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}"
     full_query = f"""
-    [out:json][timeout:120];
+    [out:json][timeout:180];
     (
         node["highway"="traffic_signals"]({bbox_str});
         node["highway"="crossing"]({bbox_str});
@@ -62,9 +66,30 @@ def _fetch_and_parse_osm_data(api_instance, city_name, bbox, _):
     >;
     out skel qt;
     """
-    logger.info(f"Ejecutando consulta Overpass para: {city_name}")
-    result = api_instance.query(full_query)
-    logger.info(f"Datos recibidos para {city_name}, procesando elementos...")
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(f"Ejecutando consulta Overpass para: {city_name} (Intento {attempt})")
+            result = api_instance.query(full_query)
+            logger.info(f"Datos recibidos para {city_name}, procesando elementos...")
+            break  # Éxito, salir del ciclo
+        except overpy.exception.OverpassTooManyRequests:
+            logger.warning(f"Demasiadas solicitudes para {city_name}, esperando 60s...")
+            time.sleep(60)
+        except IncompleteRead as e:
+            logger.warning(f"IncompleteRead para {city_name}, esperando {delay_seconds}s... ({e})")
+            time.sleep(delay_seconds)
+        except overpy.exception.OverpassGatewayTimeout as e:
+            logger.warning(f"Timeout de gateway para {city_name}, esperando {delay_seconds}s... ({e})")
+            time.sleep(delay_seconds)
+        except Exception as e:
+            logger.error(f"Error inesperado en intento {attempt} para {city_name}: {e}")
+            time.sleep(delay_seconds)
+        else:
+            break
+    else:
+        logger.error(f"Error persistente para {city_name} tras {max_retries} intentos.")
+        return []  # No se obtuvieron datos
 
     records = []
     # Procesar nodos
@@ -94,6 +119,7 @@ def _fetch_and_parse_osm_data(api_instance, city_name, bbox, _):
                     "city": city_name
                 })
     return records
+
 
 
 def extract_osm_data_func():
