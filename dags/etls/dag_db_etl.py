@@ -22,7 +22,7 @@ DB_HOST = os.getenv("DB_HOST")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_PORT = os.getenv("DB_PORT", "5432")
-DB_NAME_SOURCE = "CrashTraffic"
+DB_NAME_SOURCE = "postgres"
 DB_NAME_DIM = "CrashTraffic_Dimensional"
 
 # Crear URLs de conexión para SQLAlchemy
@@ -451,9 +451,9 @@ with DAG(
     )
 
     validate = PythonOperator(
-    task_id='validate_crash_data_gx',
-    python_callable=checkpoint_gx
-)
+        task_id='validate_crash_data_gx',
+        python_callable=checkpoint_gx
+    )
 
 
     extract >> transform >> validate
