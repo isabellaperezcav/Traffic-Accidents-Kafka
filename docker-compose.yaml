@@ -17,8 +17,9 @@ x-airflow-common:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
     - ./great_expectations:/opt/airflow/great_expectations
-    - ./data:/data
+   # - ./data:/data
     - ./requirements.txt:/requirements.txt  
+    - ./data:/opt/airflow/data
     - ./.env:/opt/airflow/.env
   user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-50000}"
   depends_on:
@@ -58,7 +59,7 @@ services:
     command: >
       bash -c "pip install -r /requirements.txt && airflow webserver"
     ports:
-      - 8081:8080
+      - 8081:8080 
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 10s
@@ -71,6 +72,7 @@ services:
     command: >
       bash -c "pip install -r /requirements.txt && airflow scheduler"
     restart: always
+
 
   airflow-worker:
     <<: *airflow-common

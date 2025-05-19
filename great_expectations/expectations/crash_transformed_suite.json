@@ -1,0 +1,24 @@
+{
+  "expectations": [
+    { "expectation_type": "expect_table_columns_to_match_ordered_list",
+      "kwargs": {
+        "column_list": [
+          "id","fecha_id","ubicacion_id","clima_id","iluminacion_id",
+          "condicion_camino_id","tipo_accidente_id","contribuyente_id",
+          "unidades","total_lesiones","fatalidades","incapacitantes",
+          "no_incapacitantes","reportadas_no_evidentes","sin_indicacion"
+        ]
+      }
+    },
+    { "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "id" }
+    },
+    { "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "fecha_id" }
+    },
+    { "expectation_type": "expect_column_values_to_be_of_type",
+      "kwargs": { "column": "unidades", "type_": "int" }
+    }
+  ],
+  "meta": { "great_expectations_version": "0.18.21" }
+}

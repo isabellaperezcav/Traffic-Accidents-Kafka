@@ -18,3 +18,4 @@ great_expectations==0.18.21
 pendulum
 pytest 
 pytest-mock
+geopandas

@@ -26,7 +26,7 @@ DIM_DB_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME
 
 # Paths de archivos CSV transformados
 CRASH_CSV_PATH = os.getenv("CRASH_TRANSFORMED_PATH", "/opt/airflow/data/crash_transformed.csv")
-OSM_CSV_PATH   = os.getenv("OSM_TRANSFORMED_PATH", "/opt/airflow/data/osm_transformed.csv")
+OSM_CSV_PATH   = os.getenv("OSM_TRANSFORMED_PATH", "/opt/airflow/data/raw/osm_transformed.csv")
 
 # Configuración de Kafka
 KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")
@@ -38,11 +38,16 @@ def extend_dimensional_model():
     with engine.connect() as conn:
         conn.execute(text("""
         CREATE TABLE IF NOT EXISTS dim_elemento_vial_osm (
-            Elemento_Vial_ID SERIAL PRIMARY KEY,
-            OSM_ID VARCHAR(50),
-            Tipo_Elemento VARCHAR(50),
-            Tags TEXT,
-            Ciudad VARCHAR(100)
+            elemento_vial_id  SERIAL PRIMARY KEY,
+            osm_id            VARCHAR(50),
+            ciudad            VARCHAR(100),
+            cerca_escuela     BOOLEAN,
+            cerca_hospital    BOOLEAN,
+            cruce_senalizado  BOOLEAN,
+            cruce_cebra       BOOLEAN,
+            cruce_sin_control BOOLEAN,
+            semaforo_peatonal BOOLEAN,
+            semaforo_simple   BOOLEAN
         );
 
         ALTER TABLE IF EXISTS hechos_accidentes
@@ -59,15 +64,15 @@ def merge_data():
     if df_crash.empty or df_osm.empty:
         raise ValueError("Uno de los datasets está vacío. Abortando merge.")
 
-    df_crash["Latitud"] = df_crash["Latitud"].round(6)
-    df_crash["Longitud"] = df_crash["Longitud"].round(6)
+    df_crash["Start_Lat"] = df_crash["Start_Lat"].round(6) 
+    df_crash["Start_Lng"] = df_crash["Start_Lng"].round(6)
     df_osm["latitude"] = df_osm["latitude"].round(6)
     df_osm["longitude"] = df_osm["longitude"].round(6)
 
     merged = pd.merge(
         df_crash,
         df_osm,
-        left_on=["Latitud", "Longitud"],
+        left_on=["Start_Lat", "Start_Lng"],   
         right_on=["latitude", "longitude"],
         how="inner"
     )
@@ -94,50 +99,45 @@ def load_to_db():
     with engine.begin() as conn:
         for _, row in df.iterrows():
             result = conn.execute(text("""
-                INSERT INTO dim_elemento_vial_osm (OSM_ID, Tipo_Elemento, Tags, Ciudad)
-                VALUES (:osm_id, :tipo, :tags, :ciudad)
-                ON CONFLICT (OSM_ID) DO NOTHING
-                RETURNING Elemento_Vial_ID
-            """), {
-                "osm_id": row["osm_id"],
-                "tipo": row["element_type"],
-                "tags": row["tags"],
-                "ciudad": row["city"]
-            })
-            osm_id = result.fetchone()
-
-            conn.execute(text("""
-                INSERT INTO hechos_accidentes (
-                    ID_Hecho, Fecha_ID, Ubicación_ID, Clima_ID, Iluminación_ID,
-                    Condición_Camino_ID, Tipo_Accidente_ID, Contribuyente_Principal_ID,
-                    Elemento_Vial_ID, Unidades_Involucradas, Total_Lesiones, Fatalidades,
-                    Incapacitantes, No_Incapacitantes, Reportadas_No_Evidentes, Sin_Indicación
+                INSERT INTO dim_elemento_vial_osm (
+                    osm_id,
+                    ciudad,
+                    cerca_escuela,
+                    cerca_hospital,
+                    cruce_senalizado,
+                    cruce_cebra,
+                    cruce_sin_control,
+                    semaforo_peatonal,
+                    semaforo_simple
                 )
                 VALUES (
-                    :id, :fecha_id, :ubicacion_id, :clima_id, :iluminacion_id,
-                    :condicion_camino_id, :tipo_accidente_id, :contribuyente_id,
-                    :elemento_vial_id, :unidades, :total_lesiones, :fatalidades,
-                    :incapacitantes, :no_incapacitantes, :reportadas, :sin_indicacion
+                    :osm_id,
+                    :ciudad,
+                    :cerca_escuela,
+                    :cerca_hospital,
+                    :cruce_senalizado,
+                    :cruce_cebra,
+                    :cruce_sin_control,
+                    :semaforo_peatonal,
+                    :semaforo_simple
                 )
-                ON CONFLICT (ID_Hecho) DO NOTHING
+                ON CONFLICT (osm_id) DO NOTHING
+                RETURNING elemento_vial_id
             """), {
-                "id": row["id"],
-                "fecha_id": row["fecha_id"],
-                "ubicacion_id": row["ubicacion_id"],
-                "clima_id": row["clima_id"],
-                "iluminacion_id": row["iluminacion_id"],
-                "condicion_camino_id": row["condicion_camino_id"],
-                "tipo_accidente_id": row["tipo_accidente_id"],
-                "contribuyente_id": row["contribuyente_id"],
-                "elemento_vial_id": osm_id[0] if osm_id else None,
-                "unidades": row["unidades"],
-                "total_lesiones": row["total_lesiones"],
-                "fatalidades": row["fatalidades"],
-                "incapacitantes": row["incapacitantes"],
-                "no_incapacitantes": row["no_incapacitantes"],
-                "reportadas": row["reportadas_no_evidentes"],
-                "sin_indicacion": row["sin_indicacion"]
+                "osm_id":           row["osm_id"],
+                "ciudad":           row["city"],
+                "cerca_escuela":    row["category_school"],
+                "cerca_hospital":   row["category_hospital"],
+                "cruce_senalizado": row["crossing_marked"],
+                "cruce_cebra":      row["crossing_zebra"],
+                "cruce_sin_control":row["crossing_uncontrolled"],
+                "semaforo_peatonal":row["traffic_signals_pedestrian_crossing"],
+                "semaforo_simple":  row["traffic_signals_signal"]
             })
+
+            osm_id = result.fetchone()
+
+# aqui
 
     log.info(f"Carga a la base de datos completada con {len(df)} filas.")
 
@@ -198,5 +198,5 @@ with DAG(
         python_callable=stream_to_kafka
     )
 
-    t1 >> t2 >> t3 >> t4
+    t1 >> t2 >> [t3, t4]
 
