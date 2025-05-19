@@ -101,6 +101,7 @@ services:
       timeout: 10s
       retries: 5
     restart: always
+    
 
 volumes:
   postgres-db-volume:
