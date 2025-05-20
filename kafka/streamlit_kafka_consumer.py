@@ -2,111 +2,105 @@ import streamlit as st
 from kafka import KafkaConsumer
 import json
 import pandas as pd
-import time
 import os
+import logging
 from dotenv import load_dotenv
+from kafka.errors import KafkaError, NoBrokersAvailable
+from streamlit_autorefresh import st_autorefresh
 
-# Cargar variables de entorno desde el archivo .env
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Cargar variables de entorno
 load_dotenv()
 
-# Configuración de Streamlit
 st.set_page_config(page_title="Dashboard de Accidentes", layout="wide")
 st.title("🚦 Dashboard de Accidentes en Tiempo Real")
 
-# Configuración de Kafka desde .env
-KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka-test:29092")
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka-test:9092")
 KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "accidentes_stream")
 
-# Estado de sesión para guardar los datos
+# Estado de sesión para almacenar los datos
 if "eventos" not in st.session_state:
     st.session_state.eventos = []
 
-# Inicializar el consumidor Kafka
-consumer = KafkaConsumer(
-    KAFKA_TOPIC,
-    bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
-    value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-    auto_offset_reset='latest',
-    enable_auto_commit=True,
-    group_id='streamlit-dashboard-group'
-)
+# Refrescar cada 5 segundos para recibir nuevos mensajes y actualizar gráficos
+st_autorefresh(interval=5000, limit=None, key="auto_refresh")
 
-# Contenedor para la tabla
-placeholder = st.empty()
+# Inicializar KafkaConsumer UNA sola vez
+if "consumer" not in st.session_state:
+    try:
+        consumer = KafkaConsumer(
+            KAFKA_TOPIC,
+            bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+            value_deserializer=lambda m: json.loads(m.decode('utf-8')),
+            auto_offset_reset='latest',
+            enable_auto_commit=True,
+            group_id='streamlit-dashboard-group',
+            max_poll_records=100
+        )
+        st.session_state.consumer = consumer
+        logger.info("Kafka consumer inicializado correctamente")
+    except NoBrokersAvailable as e:
+        st.error(f"No se pudo conectar a Kafka: {e}")
+        st.stop()
 
-# Leer algunos mensajes nuevos (no usar bucle infinito)
-msg_pack = consumer.poll(timeout_ms=1000, max_records=10)
-for tp, messages in msg_pack.items():
-    for message in messages:
-        try:
+consumer = st.session_state.consumer
+
+# Leer mensajes nuevos del topic
+try:
+    msg_pack = consumer.poll(timeout_ms=1000, max_records=100)
+    for tp, messages in msg_pack.items():
+        for message in messages:
             evento = message.value
             st.session_state.eventos.append(evento)
-        except Exception as e:
-            st.error(f"Error al procesar el mensaje: {e}")
+except KafkaError as e:
+    st.error(f"Error en la comunicación con Kafka: {e}")
 
-# Limitar a los últimos 100 registros
-df = pd.DataFrame(st.session_state.eventos[-100:])
+# Crear DataFrame con todos los datos recibidos
+df = pd.DataFrame(st.session_state.eventos)
 
-# Mostrar tabla y gráficas
-with placeholder.container():
-    st.subheader("📋 Últimos eventos de accidentes")
-    st.dataframe(df)
+st.subheader("📋 Últimos eventos de accidentes")
+if df.empty:
+    st.write("No se han recibido eventos aún.")
+else:
+    st.dataframe(df.tail(20))  # Muestra últimos 20 eventos
 
-    if not df.empty:
+    # Gráficos adaptativos según las columnas presentes
 
-        # Gráfica: Total de heridos por tipo de lesión
-        st.subheader("🚑 Lesiones Reportadas")
-        lesion_cols = [
-            'injuries_fatal',
-            'injuries_incapacitating',
-            'injuries_non_incapacitating',
-            'injuries_reported_not_evident',
-            'injuries_no_indication'
-        ]
-        if all(col in df.columns for col in lesion_cols):
-            lesion_totals = df[lesion_cols].sum()
-            st.bar_chart(lesion_totals)
+    # Mapa (usar latitud y longitud si están)
+    lat_cols = ['Start_Lat', 'latitude']
+    lon_cols = ['Start_Lng', 'longitude']
+    lat_col = next((c for c in lat_cols if c in df.columns), None)
+    lon_col = next((c for c in lon_cols if c in df.columns), None)
+    if lat_col and lon_col:
+        st.subheader("🗺️ Mapa de Accidentes")
+        # Rename columns to match st.map expectations
+        map_df = df[[lat_col, lon_col]].dropna().rename(columns={lat_col: 'latitude', lon_col: 'longitude'})
+        st.map(map_df)
 
-        # Gráfica: Accidentes por condición climática
-        if 'weather_condition' in df.columns:
-            st.subheader("☁️ Condiciones Climáticas")
-            st.bar_chart(df['weather_condition'].value_counts())
+    # Columnas categóricas y numéricas para graficar
+    cat_cols = []
+    num_cols = []
+    for col in df.columns:
+        if pd.api.types.is_numeric_dtype(df[col]):
+            num_cols.append(col)
+        else:
+            cat_cols.append(col)
 
-        # Gráfica: Tipo de primer choque
-        if 'first_crash_type' in df.columns:
-            st.subheader("💥 Tipo de Primer Impacto")
-            st.bar_chart(df['first_crash_type'].value_counts())
+    # Mostrar gráficos de barras para categóricas
+    for c in cat_cols:
+        # Mostrar solo si no es columna con muchos valores únicos (para evitar gráficos enormes)
+        if df[c].nunique() <= 30:
+            st.subheader(f"Distribución de {c}")
+            st.bar_chart(df[c].value_counts())
 
-        # Gráfica: Accidentes por hora
-        if 'crash_hour' in df.columns:
-            st.subheader("⏰ Accidentes por Hora")
-            st.line_chart(df['crash_hour'].value_counts().sort_index())
-
-        # Gráfica: Día de la semana
-        if 'crash_day_of_week' in df.columns:
-            st.subheader("📆 Accidentes por Día de la Semana")
-            dias = {
-                1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves',
-                5: 'Viernes', 6: 'Sábado', 7: 'Domingo'
-            }
-            df['crash_day_of_week'] = df['crash_day_of_week'].map(dias)
-            st.bar_chart(df['crash_day_of_week'].value_counts())
-
-        # Gráfica: Superficie vial
-        if 'roadway_surface_cond' in df.columns:
-            st.subheader("🛣️ Superficie Vial")
-            st.bar_chart(df['roadway_surface_cond'].value_counts())
-
-        # Gráfica: Causa principal
-        if 'prim_contributory_cause' in df.columns:
-            st.subheader("⚠️ Causas Principales del Accidente")
-            st.bar_chart(df['prim_contributory_cause'].value_counts().head(10))
-
-        # Mapa de ubicación
-        if 'latitude' in df.columns and 'longitude' in df.columns:
-            st.subheader("🗺️ Mapa de Ubicación de Accidentes")
-            st.map(df[['latitude', 'longitude']])
-
-# Esperar 2 segundos y recargar
-time.sleep(2)
-st.experimental_rerun()
+    # Mostrar histogramas o conteos para numéricas
+    for n in num_cols:
+        if df[n].nunique() <= 30:
+            st.subheader(f"Conteo de valores para {n}")
+            st.bar_chart(df[n].value_counts())
+        else:
+            st.subheader(f"Histograma para {n}")
+            st.bar_chart(df[n].dropna())

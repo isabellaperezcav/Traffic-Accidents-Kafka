@@ -27,7 +27,7 @@ OSM_CSV_PATH   = os.getenv("OSM_TRANSFORMED_PATH",
                            "/opt/airflow/data/raw/osm_transformed.csv")
 
 # ---- al inicio del archivo
-KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka-test:29092")
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka-test:9092")
 KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "accidentes_stream")
 
 # --------------------------------------------------------------------------- #

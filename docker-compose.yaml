@@ -1,26 +1,21 @@
-version: '3'
 
-x-airflow-common:
-  &airflow-common
+x-airflow-common: &airflow-common
   image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:2.9.0}
   environment:
-    &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
-    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'   
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKEND: 'airflow.api.auth.backend.basic_auth'
-    
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
     - ./great_expectations:/opt/airflow/great_expectations
-    # - ./data:/data
-    - ./requirements.txt:/requirements.txt  
     - ./data:/opt/airflow/data
+    - ./requirements.txt:/requirements.txt
     - ./.env:/opt/airflow/.env
   user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-50000}"
   depends_on:
@@ -28,6 +23,8 @@ x-airflow-common:
       condition: service_healthy
     postgres:
       condition: service_healthy
+  networks:
+    - airflow-kafka-network
 
 services:
   postgres:
@@ -43,6 +40,8 @@ services:
       interval: 5s
       retries: 5
     restart: always
+    networks:
+      - airflow-kafka-network
 
   redis:
     image: redis:latest
@@ -54,13 +53,15 @@ services:
       timeout: 30s
       retries: 50
     restart: always
+    networks:
+      - airflow-kafka-network
 
   airflow-webserver:
     <<: *airflow-common
     command: >
       bash -c "pip install -r /requirements.txt && airflow webserver"
     ports:
-      - 8081:8080 
+      - 8081:8080
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 10s
@@ -84,7 +85,6 @@ services:
     <<: *airflow-common
     command: version
     environment:
-      <<: *airflow-common-env
       _AIRFLOW_DB_UPGRADE: 'true'
       _AIRFLOW_WWW_USER_CREATE: 'true'
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
@@ -102,7 +102,6 @@ services:
       retries: 5
     restart: always
 
-  # Zookeeper
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
     container_name: zookeeper
@@ -111,8 +110,9 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
+    networks:
+      - airflow-kafka-network
 
-  # Kafka
   kafka-test:
     image: confluentinc/cp-kafka:latest
     container_name: kafka-test
@@ -121,17 +121,38 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
-      # Cambié host.docker.internal por localhost para que tu script pueda conectarse con localhost:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka-test:29092
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-test:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
     ports:
       - "9092:9092"
-    expose:
-      - "29092"
+    networks:
+      - airflow-kafka-network
+
+  streamlit:
+    image: python:3.12
+    container_name: streamlit
+    volumes:
+      - ./kafka/streamlit_kafka_consumer.py:/app/streamlit_kafka_consumer.py
+      - ./.env:/app/.env
+      - ./requirements.txt:/requirements.txt
+    working_dir: /app
+    command: >
+      bash -c "pip install -r /requirements.txt &&
+               streamlit run streamlit_kafka_consumer.py --server.port 8501"
+    ports:
+      - "8501:8501"
+    depends_on:
+      - kafka-test
+    networks:
+      - airflow-kafka-network
+
+networks:
+  airflow-kafka-network:
+    driver: bridge
 
 volumes:
   postgres-db-volume:
