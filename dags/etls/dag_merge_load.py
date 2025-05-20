@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 import pandas as pd
+import time
 import os, logging, json
 from kafka import KafkaProducer
 
@@ -25,8 +26,10 @@ CRASH_CSV_PATH = os.getenv("CRASH_TRANSFORMED_PATH",
 OSM_CSV_PATH   = os.getenv("OSM_TRANSFORMED_PATH",
                            "/opt/airflow/data/raw/osm_transformed.csv")
 
-KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")
-KAFKA_TOPIC  = os.getenv("KAFKA_TOPIC",  "accidentes_con_osm")
+# ---- al inicio del archivo
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka-test:29092")
+KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "accidentes_stream")
+
 # --------------------------------------------------------------------------- #
 
 
@@ -133,23 +136,30 @@ def load_to_db() -> None:
     log.info("Carga a la base de datos completada con %s filas.", len(df))
 
 
-def stream_to_kafka() -> None:
+def stream_to_kafka():
     csv_path = "/opt/airflow/data/merged_final.csv"
     if not os.path.exists(csv_path):
         raise FileNotFoundError("No se encontró el archivo de datos finales para Kafka")
 
     df = pd.read_csv(csv_path)
+
+    servers = [s.strip() for s in os.environ["KAFKA_BOOTSTRAP_SERVERS"].split(",")]
+
     producer = KafkaProducer(
-        bootstrap_servers=KAFKA_BROKER,
+        bootstrap_servers=servers,
         value_serializer=lambda v: json.dumps(v).encode("utf-8")
     )
 
+    topic = "nombre_del_topic"
+
     for _, row in df.iterrows():
-        producer.send(KAFKA_TOPIC, value=row.to_dict())
+        message = row.to_dict()
+        producer.send(topic, value=message)
+        print(f"Enviado: {message}")
+        time.sleep(1)  
 
     producer.flush()
-    log.info("Enviadas %s filas a Kafka topic: %s", len(df), KAFKA_TOPIC)
-
+    producer.close()
 
 # ------------------------------ DAG ----------------------------------------- #
 default_args = {"owner": "airflow", "start_date": datetime(2024, 1, 1), "retries": 1}

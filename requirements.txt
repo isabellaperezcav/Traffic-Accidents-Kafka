@@ -19,3 +19,4 @@ pendulum
 pytest 
 pytest-mock
 geopandas
+streamlit

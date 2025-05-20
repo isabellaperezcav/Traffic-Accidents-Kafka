@@ -15,7 +15,7 @@ sys.path.append(os.path.abspath("/opt/airflow/dags"))
 GX_ROOT = os.getenv("GX_PROJECT_ROOT_DIR", "/opt/airflow/great_expectations")
 
 # Importar funciones locales si fueran necesarias
-from etls.dag_db_etl import extract_db, transform_db, checkpoint_gx
+from etls.dag_db_etl import setup_tables, extract_db, transform_db, checkpoint_gx
 from etls.dag_api_etl import extract_osm_data_func, transform_osm_data_func, validate_osm_data_with_gx_func
 from etls.dag_merge_load import merge_data, load_to_db, stream_to_kafka
 
@@ -36,6 +36,11 @@ with DAG(
 ) as dag:
 
     # --- DB ETL ---
+    setup_tables_crash = PythonOperator(
+        task_id='setup_tables',
+        python_callable=setup_tables
+    )
+
     extract_crash_data = PythonOperator(
         task_id='extract_crash_data',
         python_callable=extract_db
@@ -84,6 +89,6 @@ with DAG(
     )
 
     # Dependencias
-    extract_crash_data >> transform_crash_data >> validate_crash_data
+    setup_tables_crash >> extract_crash_data >> transform_crash_data >> validate_crash_data
     extract_osm_data >> transform_osm_data >> validate_osm_data
     [validate_crash_data, validate_osm_data] >> merge_crash_osm_data >> [load_crash_db, stream_to_kafka_task]
