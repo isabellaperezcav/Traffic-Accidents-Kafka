@@ -136,30 +136,31 @@ def load_to_db() -> None:
     log.info("Carga a la base de datos completada con %s filas.", len(df))
 
 
-def stream_to_kafka():
+def stream_to_kafka() -> None:
     csv_path = "/opt/airflow/data/merged_final.csv"
     if not os.path.exists(csv_path):
         raise FileNotFoundError("No se encontró el archivo de datos finales para Kafka")
 
     df = pd.read_csv(csv_path)
 
-    servers = [s.strip() for s in os.environ["KAFKA_BOOTSTRAP_SERVERS"].split(",")]
+    servers = [s.strip() for s in KAFKA_BOOTSTRAP_SERVERS.split(",")]
 
     producer = KafkaProducer(
         bootstrap_servers=servers,
         value_serializer=lambda v: json.dumps(v).encode("utf-8")
     )
 
-    topic = "nombre_del_topic"
+    print(f"Streaming datos al topic '{KAFKA_TOPIC}' en servidores {servers}...")
 
     for _, row in df.iterrows():
         message = row.to_dict()
-        producer.send(topic, value=message)
-        print(f"Enviado: {message}")
-        time.sleep(1)  
+        producer.send(KAFKA_TOPIC, value=message)
+        print(f"Mensaje enviado: {message}")
+        time.sleep(1)  # Espera 1 segundo entre cada fila
 
     producer.flush()
     producer.close()
+    print("Streaming finalizado correctamente.")
 
 # ------------------------------ DAG ----------------------------------------- #
 default_args = {"owner": "airflow", "start_date": datetime(2024, 1, 1), "retries": 1}
