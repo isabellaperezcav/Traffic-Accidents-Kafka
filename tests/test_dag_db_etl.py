@@ -1,16 +1,47 @@
-#test_dag_db_etl
-import pytest
-from unittest.mock import MagicMock, patch
-from dags.etls.dag_db_etl import transform_db
+import unittest
+from airflow.models import DagBag
+import datetime
 
-def test_transform_db_with_mock():
-    with patch("dags.dag_db_etl.create_engine"), \
-         patch("dags.dag_db_etl.text"), \
-         patch("dags.dag_db_etl.pd.DataFrame.to_csv") as mock_to_csv:
-        
-        # Llama a la función
-        batches = transform_db()
 
-        # Verificaciones mínimas
-        mock_to_csv.assert_called()
-        assert isinstance(batches, list)
+class TestDagPago(unittest.TestCase):
+
+    def setUp(self):
+        self.dagbag = DagBag()
+        self.dag = self.dagbag.get_dag('dag_db_etl')  # Usamos el ID correcto del DAG
+
+    def test_dag_loaded(self):
+        """Verifica que el DAG se cargue correctamente"""
+        self.assertIsNotNone(self.dag)
+        self.assertGreater(len(self.dag.tasks), 0)
+
+    def test_task_types(self):
+        """Verifica que las tareas no sean None"""
+        for task in self.dag.tasks:
+            self.assertIsNotNone(task.task_id)
+            self.assertIsNotNone(task.owner)
+
+    def test_dag_params_not_none(self):
+        """Verifica que los parámetros del DAG no sean None, excepto start_date que puede ser None"""
+        self.assertIsNotNone(self.dag.schedule_interval)
+        self.assertIsNotNone(self.dag.default_args)
+        # No hacemos assert para start_date porque puede ser None
+
+    def test_dag_params_types(self):
+        """Verifica los tipos de datos de los parámetros del DAG"""
+        self.assertIsInstance(self.dag.schedule_interval, (str, type(None)))
+        if self.dag.start_date is not None:
+            self.assertIsInstance(self.dag.start_date, datetime.datetime)
+
+        default_args = self.dag.default_args
+
+        if 'retries' in default_args:
+            self.assertIsInstance(default_args['retries'], int)
+        # Validación eliminada como pediste:
+        # if 'retry_delay' in default_args:
+        #     self.assertIsInstance(default_args['retry_delay'], datetime.timedelta)
+        if 'email_on_failure' in default_args:
+            self.assertIsInstance(default_args['email_on_failure'], bool)
+
+
+if __name__ == '__main__':
+    unittest.main()

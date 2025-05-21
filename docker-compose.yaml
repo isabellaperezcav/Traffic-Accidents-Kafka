@@ -17,6 +17,7 @@ x-airflow-common: &airflow-common
     - ./data:/opt/airflow/data
     - ./requirements.txt:/requirements.txt
     - ./.env:/opt/airflow/.env
+    - ./tests:/opt/airflow/tests 
   user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-50000}"
   depends_on:
     redis:
