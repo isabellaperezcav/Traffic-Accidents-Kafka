@@ -1,73 +1,73 @@
-# Traffic Accidents ETL con Kafka
+# Traffic Accidents ETL with Kafka
 
-## Descripción General
+## Overview
 
-El proyecto **Traffic Accidents ETL con Kafka** es una solución avanzada de pipeline de datos, diseñada para procesar, analizar y visualizar datos de accidentes de tráfico en tiempo real. Integra **Apache Airflow** para la orquestación de flujos de trabajo, **Kafka** para el streaming de datos, y **Streamlit** para la visualización en tiempo real. El pipeline extrae datos de un CSV de **Kaggle** (migrado a **PostgreSQL**) y los enriquece con información geoespacial de **OpenStreetMap (OSM)**, permitiendo análisis de patrones de accidentes y zonas de riesgo. Los datos transformados se almacenan en un modelo dimensional y se visualizan mediante dashboards en **Power BI** y **Streamlit**.
-
----
-
-## Objetivos
-
-* **Extraer**: Obtener datos de accidentes de tráfico desde PostgreSQL (`CrashTraffic`) y datos geoespaciales desde la API de OSM.
-* **Transformar**: Limpiar, enriquecer y estructurar los datos dentro de un modelo dimensional.
-* **Cargar**: Almacenar los datos transformados en PostgreSQL (`CrashTraffic_Dimensional`).
-* **Orquestar**: Automatizar el pipeline utilizando Apache Airflow.
-* **Analizar**: Realizar análisis exploratorios (EDA) sobre datos de accidentes y de OSM.
-* **Visualizar**: Crear dashboards en Power BI y Streamlit.
-* **Streaming**: Transmitir métricas con Kafka y visualizarlas en tiempo real mediante Streamlit.
+The **Traffic Accidents ETL with Kafka** project is an advanced data pipeline solution designed to process, analyze, and visualize traffic accident data in real time. It integrates **Apache Airflow** for workflow orchestration, **Kafka** for data streaming, and **Streamlit** for real-time visualization. The pipeline extracts data from a **Kaggle** CSV (migrated to **PostgreSQL**) and enriches it with geospatial information from **OpenStreetMap (OSM)**, enabling analysis of accident patterns and risk zones. Transformed data is stored in a dimensional model and visualized through dashboards in **Power BI** and **Streamlit**.
 
 ---
 
-## Fuente de Datos
+## Objectives
 
-El dataset principal proviene de **Kaggle** (*Traffic Accidents*), con más de **10,000 registros** sobre severidad, clima y datos temporales, migrado a PostgreSQL (`CrashTraffic`). Este se enriquece con datos geoespaciales de **OSM**.
+* **Extract**: Retrieve traffic accident data from PostgreSQL (`CrashTraffic`) and geospatial data from the OSM API.
+* **Transform**: Clean, enrich, and structure the data within a dimensional model.
+* **Load**: Store the transformed data in PostgreSQL (`CrashTraffic_Dimensional`).
+* **Orchestrate**: Automate the pipeline using Apache Airflow.
+* **Analyze**: Perform exploratory data analysis (EDA) on accident and OSM data.
+* **Visualize**: Create dashboards in Power BI and Streamlit.
+* **Streaming**: Stream metrics with Kafka and visualize them in real time via Streamlit.
 
 ---
 
-## Pipeline ETL
+## Data Source
 
-### Extracción
+The main dataset comes from **Kaggle** (*Traffic Accidents*), with over **10,000 records** on severity, weather, and temporal data, migrated to PostgreSQL (`CrashTraffic`). This is enriched with geospatial data from **OSM**.
 
-* **Fuente**: Tabla `CrashTraffic` en PostgreSQL y API de OSM.
-* **Método**: Scripts en Python y consultas SQL; OSM procesado en `API_EDA.ipynb`.
+---
 
-### Transformación
+## ETL Pipeline
 
-* **Limpieza**: Eliminación de nulos y duplicados, estandarización de categorías.
-* **Ingeniería**: Conversión de fechas y creación de variables categóricas/binarias.
-* **Enriquecimiento**: Integración con datos de OSM.
-* **Modelo Dimensional**: Esquema en estrella para consultas eficientes.
-* **Pruebas Unitarias**: Validación de transformaciones con `pytest`.
-* **Great Expectations**: Validación de datos antes del merge.
-* **Merge**: Combinación de datos entre la base y OSM.
+### Extraction
 
-### Carga
+* **Source**: `CrashTraffic` table in PostgreSQL and OSM API.
+* **Method**: Python scripts and SQL queries; OSM processed in `API_EDA.ipynb`.
 
-* **Destino**: `CrashTraffic_Dimensional` en PostgreSQL.
-* **Método**: Carga mediante SQLAlchemy vía Airflow.
+### Transformation
 
-### Orquestación
+* **Cleaning**: Removal of nulls and duplicates, category standardization.
+* **Engineering**: Date conversion and creation of categorical/binary variables.
+* **Enrichment**: Integration with OSM data.
+* **Dimensional Model**: Star schema for efficient querying.
+* **Unit Testing**: Transformation validation with `pytest`.
+* **Great Expectations**: Data validation before merging.
+* **Merge**: Combine base and OSM data.
 
-* **Airflow**: DAG `etl_crash_traffic` para automatizar el proceso ETL.
+### Load
+
+* **Target**: `CrashTraffic_Dimensional` in PostgreSQL.
+* **Method**: Load via SQLAlchemy through Airflow.
+
+### Orchestration
+
+* **Airflow**: DAG `etl_crash_traffic` to automate the ETL process.
 
 ### Streaming
 
-* **Kafka**: Transmisión de métricas post-merge.
-* **Consumidor**: Script en Python con Streamlit para visualización en tiempo real.
+* **Kafka**: Stream post-merge metrics.
+* **Consumer**: Python script with Streamlit for real-time visualization.
 
 ---
 
-## Análisis Exploratorio (EDA)
+## Exploratory Data Analysis (EDA)
 
-* **API EDA (`API_EDA.ipynb`)**: Análisis de datos desde OSM.
-* **Dataset EDA (`002_EDA_csv.ipynb`)**: Análisis univariado, bivariado y temporal de accidentes.
+* **API EDA (`API_EDA.ipynb`)**: Data analysis from OSM.
+* **Dataset EDA (`002_EDA_csv.ipynb`)**: Univariate, bivariate, and temporal accident analysis.
 
 ---
 
-## Visualizaciones
+## Visualizations
 
-* **Power BI**: Dashboard con insights clave (severidad, clima, tendencias).
-* **Streamlit**: Dashboard en tiempo real mostrando métricas vía Kafka.
+* **Power BI**: Dashboard with key insights (severity, weather, trends).
+* **Streamlit**: Real-time dashboard showing metrics via Kafka.
 
 ---
 
@@ -89,126 +89,133 @@ TRAFFICACCIDENTS/
 ├── data/
 │   ├── CrashTraffic_clean.csv
 │   └── CrashTraffic.csv
+├── great_expectations/
+├── kafka/
+│   ├── streamlit_kafka_consumer.py
 ├─  logs/
 ├── notebooks/
 │   ├── 001_extract.ipynb
 │   ├── 002_EDA_csv.ipynb
 ├── pdf/
+├── tests/
+│   ├── test_dag_api_etl.py
+│   ├── test_dag_db_etl.py
 ├── venv/
 ├── .env
 ├── .gitignore
 ├── docker-compose.yaml
+├── proyecto03.code-workspace
 ├── README.md
 └── requirements.txt
 ```
 
 ---
 
-## Tecnologías
+## Technologies
 
-* **Lenguaje y procesamiento**: Python, pandas, numpy
-* **Visualización**: matplotlib, seaborn, Power BI, Streamlit
-* **Base de Datos**: PostgreSQL, psycopg2, SQLAlchemy
-* **Orquestación**: Apache Airflow
+* **Language and Processing**: Python, pandas, numpy
+* **Visualization**: matplotlib, seaborn, Power BI, Streamlit
+* **Database**: PostgreSQL, psycopg2, SQLAlchemy
+* **Orchestration**: Apache Airflow
 * **Streaming**: Apache Kafka
-* **Contenerización**: Docker, Docker Compose
+* **Containerization**: Docker, Docker Compose
 * **Notebooks**: Jupyter
-* **Versionado**: Git, GitHub
-* **Pruebas**: pytest
-* **Validación**: Great Expectations
+* **Version Control**: Git, GitHub
+* **Testing**: pytest
+* **Validation**: Great Expectations
 
 ---
 
-## Destino Final
+## Final Destination
 
-* **Base de Datos**: `CrashTraffic_Dimensional`
-* **Dashboards**: Power BI y Streamlit
-
----
-
-## Rendimiento y Hallazgos
-
-* **Eficiencia**: Optimización para grandes volúmenes de datos.
-* **Hallazgos**: Correlaciones entre condiciones adversas y lesiones, identificación de picos de accidentes y zonas de alto riesgo.
+* **Database**: `CrashTraffic_Dimensional`
+* **Dashboards**: Power BI and Streamlit
 
 ---
 
-## Requerimientos Cumplidos
+## Performance and Findings
 
-Cumple con los criterios del proyecto **"ETL class project - Final delivery"**:
-
-* Fuentes: Kaggle y OSM
-* DAG Airflow: ETL con modelo dimensional
-* Streaming: Kafka para métricas
-* Dashboards: Power BI y Streamlit
-* Consumidor Kafka: Visualización en Streamlit
-* GitHub: Repositorio con notebooks de EDA incluidos
+* **Efficiency**: Optimized for large data volumes.
+* **Findings**: Correlations between adverse conditions and injuries, identification of accident peaks and high-risk zones.
 
 ---
 
-## Instalación
+## Requirements Fulfilled
 
-1. **Clonar el repositorio**:
+Meets the criteria of the **"ETL class project - Final delivery"**:
+
+* Sources: Kaggle and OSM
+* Airflow DAG: ETL with dimensional model
+* Streaming: Kafka for metrics
+* Dashboards: Power BI and Streamlit
+* Kafka Consumer: Visualization in Streamlit
+* GitHub: Repository with EDA notebooks included
+
+---
+
+## Installation
+
+1. **Clone the repository**:
 
    ```bash
    git clone https://github.com/isabellaperezcav/Traffic-Accidents-Kafka.git
    cd Traffic-Accidents-Kafka
    ```
 
-2. **Crear entorno virtual**:
+2. **Create virtual environment**:
 
    ```bash
    python -m venv venv
    source venv/bin/activate
    ```
 
-3. **Instalar dependencias**:
+3. **Install dependencies**:
 
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Configurar PostgreSQL**:
+4. **Configure PostgreSQL**:
 
    ```sql
    CREATE DATABASE crash_traffic;
    CREATE DATABASE crash_traffic_dimensional;
    ```
 
-   Actualizar `config/conexion_db.py`.
+   Update `config/conexion_db.py`.
 
-5. **Variables de entorno**: Crear archivo `.env` con:
+5. **Environment variables**: Create `.env` file with:
 
    ```
    AIRFLOW__CORE__EXECUTOR=SequentialExecutor
    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://user:password@localhost:5432/airflow
    DB_HOST=localhost
    DB_PORT=5432
-   DB_USER=tu_usuario
-   DB_NAME=tu_base_de_datos
-   DB_PASSWORD=tu_contraseña
+   DB_USER=your_user
+   DB_NAME=your_database
+   DB_PASSWORD=your_password
    KAFKA_BOOTSTRAP_SERVERS=localhost:9092
    ```
 
-6. **Levantar Airflow con Docker**:
+6. **Start Airflow with Docker**:
 
    ```bash
    docker-compose up -d
    ```
 
-   Acceder a: [http://localhost:8080](http://localhost:8080)
+   Access at: [http://localhost:8080](http://localhost:8080)
 
-7. **Configurar Kafka**: Crear topic y verificar ejecución.
+7. **Configure Kafka**: Create topic and verify execution.
 
-8. **Ejecutar notebooks**:
+8. **Run notebooks**:
 
    * `001_extract.ipynb`
    * `002_EDA_csv.ipynb`
    * `API_EDA.ipynb`
 
-9. **Ejecutar pipeline**: Activar DAG `etl_crash_traffic` en Airflow.
+9. **Run pipeline**: Activate DAG `etl_crash_traffic` in Airflow.
 
-10. **Kafka y Streamlit**:
+10. **Kafka and Streamlit**:
 
     ```bash
     python kafka/producer.py
@@ -217,24 +224,26 @@ Cumple con los criterios del proyecto **"ETL class project - Final delivery"**:
 
 ---
 
-## Uso
+## Usage
 
-* **Pipeline**: Activar DAG en Airflow.
-* **Dashboards**: Explorar visualizaciones en Power BI y Streamlit tras la ejecución.
-
----
-
-## Mantenimiento
-
-* **Monitoreo**: Desde la interfaz de Airflow.
-* **Problemas comunes**:
-
-  * Conexión: Verificar credenciales.
-  * Airflow: Revisar dependencias.
-  * Kafka: Asegurar creación de topic y ejecución del productor/consumidor.
+* **Pipeline**: Activate DAG in Airflow.
+* **Dashboards**: Explore visualizations in Power BI and Streamlit after execution.
 
 ---
 
-## Conclusión
+## Maintenance
 
-Este pipeline robusto integra herramientas avanzadas para ofrecer insights sobre accidentes de tráfico, apoyando estrategias de **seguridad vial** a través del análisis de datos en tiempo real.
+* **Monitoring**: From the Airflow interface.
+* **Common issues**:
+
+  * Connection: Check credentials.
+  * Airflow: Review dependencies.
+  * Kafka: Ensure topic creation and producer/consumer execution.
+
+---
+
+## Conclusion
+
+This robust pipeline integrates advanced tools to deliver insights on traffic accidents, supporting **road safety** strategies through real-time data analysis.
+
+---
